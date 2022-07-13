@@ -41,6 +41,7 @@ private:
     amrex::Real ascalar = 1.e-3;
     amrex::Real bscalar = 1.0;
 
+    int do_nsolve = 1;
     int do_overset = 1;
     amrex::iMultiFab oversetmask;
 

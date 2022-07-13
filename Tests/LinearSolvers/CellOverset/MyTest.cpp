@@ -66,7 +66,8 @@ MyTest::solve ()
     MLMG mlmg(*mlabec);
     mlmg.setVerbose(verbose);
     mlmg.setBottomVerbose(bottom_verbose);
-
+    mlmg.setNSolve(do_nsolve);
+    //mlmg.setMaxIter(2000);
 #ifdef AMREX_USE_HYPRE
     if (use_hypre) {
         mlmg.setBottomSolver(amrex::BottomSolver::hypre);
@@ -80,7 +81,7 @@ MyTest::solve ()
 void
 MyTest::writePlotfile ()
 {
-    Vector<std::string> varname = {"solution", "rhs", "exact_solution", "error", "acoef", "bcoef"};
+    Vector<std::string> varname = {"solution", "rhs", "exact_solution", "error", "acoef", "bcoef", "mask"};
     MultiFab plotmf(grids, dmap, varname.size(), 0);
     MultiFab::Copy(plotmf, phi       , 0, 0, 1, 0);
     MultiFab::Copy(plotmf, rhs       , 0, 1, 1, 0);
@@ -89,6 +90,7 @@ MyTest::writePlotfile ()
     MultiFab::Subtract(plotmf, plotmf, 2, 3, 1, 0); // error = soln - exact
     MultiFab::Copy(plotmf, acoef     , 0, 4, 1, 0);
     MultiFab::Copy(plotmf, bcoef     , 0, 5, 1, 0);
+    MultiFab::Copy(plotmf, amrex::ToMultiFab(oversetmask)      , 0, 6, 1, 0);
     auto dx = geom.CellSize();
     Real dvol = AMREX_D_TERM(dx[0],*dx[1],*dx[2]);
     amrex::Print() << " max-norm error: " << plotmf.norminf(3)
@@ -110,6 +112,7 @@ MyTest::readParameters ()
     pp.query("max_coarsening_level", max_coarsening_level);
 
     pp.query("do_overset", do_overset);
+    pp.query("do_nsolve", do_nsolve);
 
 #ifdef AMREX_USE_HYPRE
     pp.query("use_hypre", use_hypre);
@@ -142,8 +145,9 @@ MyTest::initData ()
     bcoef.define(grids, dmap, 1, 1);
     oversetmask.define(grids, dmap, 1, 0);
 
-    Box overset_box = amrex::grow(geom.Domain(), -n_cell/4); // middle of the domain
+    //Box overset_box = amrex::grow(geom.Domain(), n_cell/4); // middle of the domain
     // Box overset_box = amrex::shift(geom.Domain(), 0, n_cell/2); // right half
+    Box overset_box(IntVect{AMREX_D_DECL(199,195,60)},IntVect{AMREX_D_DECL(213,207,80)});
 
     const auto prob_lo = geom.ProbLoArray();
     const auto prob_hi = geom.ProbHiArray();
@@ -212,7 +216,7 @@ MyTest::initData ()
             phifab(i,j,k) = 0.0;
 
             if (vbx.contains(IntVect(AMREX_D_DECL(i,j,k)))) {
-                alpha(i,j,k) = 1.;
+                alpha(i,j,k) = 0.;
                 rhsfab(i,j,k) = beta(i,j,k)*b*fac*(std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
                                                  + std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z))
                             + dbdrfac*((x-xc)*(tpi*std::sin(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
@@ -223,7 +227,8 @@ MyTest::initData ()
                                               + pi*std::cos(fpi*x) * std::cos(fpi*y) * std::sin(fpi*z)))
                                             + a * (std::cos(tpi*x) * std::cos(tpi*y) * std::cos(tpi*z)
                                           + 0.25 * std::cos(fpi*x) * std::cos(fpi*y) * std::cos(fpi*z));
-                if (loverset && overset_box.contains(IntVect(AMREX_D_DECL(i,j,k)))) {
+                if ((sqrt((.2-x)*(.2-x)+(.3-y)*(.3-y)) < 0.3 && sqrt((.41-x)*(.41-x)+(.36-y)*(.36-y)) < .25) || overset_box.contains(IntVect(AMREX_D_DECL(i,j,k))) || sqrt((.67-x)*(.67-x)+(.71-y)*(.71-y)) < 0.05) {
+//loverset && overset_box.contains(IntVect(AMREX_D_DECL(i,j,k)))) {
                     mask(i,j,k) = 0;
                     phifab(i,j,k) = exact(i,j,k);
                 } else {

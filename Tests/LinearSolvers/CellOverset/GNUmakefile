@@ -14,7 +14,7 @@ USE_OMP  = FALSE
 USE_HYPRE  = FALSE
 USE_PETSC  = FALSE
 
-COMP = gnu
+COMP = clang 
 
 DIM = 2
 
